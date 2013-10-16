@@ -10,6 +10,8 @@ from django.http import Http404
 
 from airbrake import __version__, __app_name__, __app_url__
 
+from airbrake.middleware import get_current_request
+
 # Adapted from Pulse Energy's AirbrakePy
 # https://github.com/pulseenergy/airbrakepy
 # Changes for django compatibility by Bouke Haarsma
@@ -42,7 +44,7 @@ class AirbrakeHandler(logging.Handler):
 
         message = record.getMessage()
         if exn:
-            message = "{0}: {1}".format(message, str(exn))
+            message = u"{0}: {1}".format(message, exn)
 
         xml = Element('notice', dict(version='2.0'))
         SubElement(xml, 'api-key').text = self.api_key
@@ -55,51 +57,68 @@ class AirbrakeHandler(logging.Handler):
         server_env = SubElement(xml, 'server-environment')
         SubElement(server_env, 'environment-name').text = self.env_name
 
-        if hasattr(record, 'request'):
-            request = record.request
+        request_xml = SubElement(xml, 'request')
+        params = SubElement(request_xml, 'params')
+        session = SubElement(request_xml, 'session')
+        cgi_data = SubElement(request_xml, 'cgi-data')
+
+        request = get_current_request()
+        if request is not None:
             try:
                 match = resolve(request.path_info)
             except Http404:
                 match = None
 
-            request_xml = SubElement(xml, 'request')
             SubElement(request_xml, 'url').text = request.build_absolute_uri()
 
             if match:
                 SubElement(request_xml, 'component').text = match.url_name
                 SubElement(request_xml, 'action').text = request.method
 
-            params = SubElement(request_xml, 'params')
             for key, value in request.REQUEST.items():
-                SubElement(params, 'var', dict(key=key)).text = str(value)
+                SubElement(params, 'var', key=unicode(key)).text = unicode(value)
 
-            session = SubElement(request_xml, 'session')
             for key, value in request.session.items():
-                SubElement(session, 'var', dict(key=key)).text = str(value)
+                SubElement(session, 'var', key=unicode(key)).text = unicode(value)
 
-            cgi_data = SubElement(request_xml, 'cgi-data')
             for key, value in os.environ.items():
                 if key in self.env_variables:
-                    SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
+                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
             for key, value in request.META.items():
                 if key in self.meta_variables:
-                    SubElement(cgi_data, 'var', dict(key=key)).text = str(value)
+                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
+
+            if request.user.is_authenticated():
+                user = request.user.get_profile()
+                SubElement(cgi_data, 'var', key='User').text = u"{0} <{1}> ({2})".format(
+                    user.full_name,
+                    user.primary_email_id,
+                    user.pk)
+
+        if trace is not None:
+            prev = trace
+            curr = trace.tb_next
+            while curr is not None:
+                prev = curr
+                curr = curr.tb_next
+            for key, value in prev.tb_frame.f_locals.items():
+                if key not in ['request']:
+                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
 
         error = SubElement(xml, 'error')
-        SubElement(error, 'class').text = exn.__class__.__name__ if exn else ''
-        SubElement(error, 'message').text = message
+        SubElement(error, 'class').text = unicode(exn.__class__.__name__) if exn else ''
+        SubElement(error, 'message').text = unicode(message)
 
         backtrace = SubElement(error, 'backtrace')
         if trace is None:
-            SubElement(backtrace, 'line', dict(file=record.pathname,
-                                               number=str(record.lineno),
-                                               method=record.funcName))
+            SubElement(backtrace, 'line', file=record.pathname,
+                                          number=str(record.lineno),
+                                          method=record.funcName)
         else:
             for pathname, lineno, funcName, text in traceback.extract_tb(trace):
-                SubElement(backtrace, 'line', dict(file=pathname,
-                                                   number=str(lineno),
-                                                   method='%s: %s' % (funcName,
-                                                                      text)))
+                SubElement(backtrace, 'line', file=pathname,
+                                              number=str(lineno),
+                                              method=u'%s: %s' % (funcName, text))
 
         return tostring(xml)
 
