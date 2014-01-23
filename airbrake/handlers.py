@@ -118,7 +118,7 @@ class AirbrakeHandler(logging.Handler):
             for pathname, lineno, funcName, text in traceback.extract_tb(trace):
                 SubElement(backtrace, 'line', file=pathname,
                                               number=str(lineno),
-                                              method=u'%s: %s' % (funcName, text))
+                                              method=unicode(u'{}: {}'.format(funcName, text)).encode('utf-8'))
 
         return tostring(xml)
 
