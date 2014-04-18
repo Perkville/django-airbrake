@@ -20,11 +20,13 @@ _DEFAULT_API_URL = 'https://airbrakeapp.com/notifier_api/v2/notices'
 _DEFAULT_ENV_VARIABLES = ['DJANGO_SETTINGS_MODULE', ]
 _DEFAULT_META_VARIABLES = ['HTTP_USER_AGENT', 'HTTP_COOKIE', 'REMOTE_ADDR',
                            'SERVER_NAME', 'SERVER_SOFTWARE', ]
+_DEFAULT_REDACTED_KEYS = []
 
 class AirbrakeHandler(logging.Handler):
     def __init__(self, api_key, env_name, api_url=_DEFAULT_API_URL,
                  timeout=30, env_variables=_DEFAULT_ENV_VARIABLES,
-                 meta_variables=_DEFAULT_META_VARIABLES):
+                 meta_variables=_DEFAULT_META_VARIABLES, 
+                 redacted_keys=_DEFAULT_REDACTED_KEYS):
         logging.Handler.__init__(self)
         self.api_key = api_key
         self.api_url = api_url
@@ -32,6 +34,7 @@ class AirbrakeHandler(logging.Handler):
         self.env_variables = env_variables
         self.meta_variables = meta_variables
         self.timeout = timeout
+        self.redacted_keys = redacted_keys
 
     def emit(self, record):
         self._sendMessage(self._generate_xml(record))
@@ -76,6 +79,8 @@ class AirbrakeHandler(logging.Handler):
                 SubElement(request_xml, 'action').text = request.method
 
             for key, value in request.REQUEST.items():
+                if key in self.redacted_keys:
+                    value = '*** REDACTED ***'
                 SubElement(params, 'var', key=unicode(key)).text = unicode(value)
 
             for key, value in request.session.items():
