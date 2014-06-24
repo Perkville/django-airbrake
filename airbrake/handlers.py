@@ -26,7 +26,7 @@ _DEFAULT_REDACTED_KEYS = []
 def to_unicode(val):
     if type(val) is unicode:
         return val
-    elif issubclass(basestring, val):
+    elif isinstance(val, basestring):
         return unicode(val, 'utf-8')
     else:
         return unicode(val)
