@@ -26,8 +26,10 @@ _DEFAULT_REDACTED_KEYS = []
 def to_unicode(val):
     if type(val) is unicode:
         return val
-    else:
+    elif issubclass(basestring, val):
         return unicode(val, 'utf-8')
+    else:
+        return unicode(val)
 
 
 class AirbrakeHandler(logging.Handler):
