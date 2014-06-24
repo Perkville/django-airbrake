@@ -22,6 +22,14 @@ _DEFAULT_META_VARIABLES = ['HTTP_USER_AGENT', 'HTTP_COOKIE', 'REMOTE_ADDR',
                            'SERVER_NAME', 'SERVER_SOFTWARE', ]
 _DEFAULT_REDACTED_KEYS = []
 
+
+def to_unicode(val):
+    if type(val) is unicode:
+        return val
+    else:
+        return unicode(val, 'utf-8')
+
+
 class AirbrakeHandler(logging.Handler):
     def __init__(self, api_key, env_name, api_url=_DEFAULT_API_URL,
                  timeout=30, env_variables=_DEFAULT_ENV_VARIABLES,
@@ -81,17 +89,17 @@ class AirbrakeHandler(logging.Handler):
             for key, value in request.REQUEST.items():
                 if key in self.redacted_keys:
                     value = '*** REDACTED ***'
-                SubElement(params, 'var', key=unicode(key)).text = unicode(value)
+                SubElement(params, 'var', key=to_unicode(key)).text = to_unicode(value)
 
             for key, value in request.session.items():
-                SubElement(session, 'var', key=unicode(key)).text = unicode(value)
+                SubElement(session, 'var', key=to_unicode(key)).text = to_unicode(value)
 
             for key, value in os.environ.items():
                 if key in self.env_variables:
-                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
+                    SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
             for key, value in request.META.items():
                 if key in self.meta_variables:
-                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
+                    SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
             if request.user.is_authenticated():
                 user = request.user.get_profile()
@@ -108,11 +116,11 @@ class AirbrakeHandler(logging.Handler):
                 curr = curr.tb_next
             for key, value in prev.tb_frame.f_locals.items():
                 if key not in ['request']:
-                    SubElement(cgi_data, 'var', key=unicode(key)).text = unicode(value)
+                    SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
         error = SubElement(xml, 'error')
-        SubElement(error, 'class').text = unicode(exn.__class__.__name__) if exn else ''
-        SubElement(error, 'message').text = unicode(message)
+        SubElement(error, 'class').text = to_unicode(exn.__class__.__name__) if exn else ''
+        SubElement(error, 'message').text = to_unicode(message)
 
         backtrace = SubElement(error, 'backtrace')
         if trace is None:
@@ -123,7 +131,7 @@ class AirbrakeHandler(logging.Handler):
             for pathname, lineno, funcName, text in traceback.extract_tb(trace):
                 SubElement(backtrace, 'line', file=pathname,
                                               number=str(lineno),
-                                              method=unicode(u'{}: {}'.format(funcName, text)).encode('utf-8'))
+                                              method=to_unicode(u'{}: {}'.format(funcName, text)))
 
         return tostring(xml)
 
