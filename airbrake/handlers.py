@@ -133,7 +133,7 @@ class AirbrakeHandler(logging.Handler):
             for pathname, lineno, funcName, text in traceback.extract_tb(trace):
                 SubElement(backtrace, 'line', file=pathname,
                                               number=str(lineno),
-                                              method=to_unicode(u'{}: {}'.format(funcName, text)))
+                                              method=(u'{}: {}'.format(to_unicode(funcName), to_unicode(text))))
 
         return tostring(xml)
 
