@@ -24,18 +24,24 @@ _DEFAULT_REDACTED_KEYS = []
 
 
 def to_unicode(val):
-    if type(val) is unicode:
-        return val
-    elif isinstance(val, basestring):
-        return unicode(val, 'utf-8')
-    else:
-        return unicode(val)
+    try:
+        if type(val) is unicode:
+            return val
+        elif isinstance(val, basestring):
+            return unicode(val, 'utf-8')
+        else:
+            return unicode(val)
+    except:
+        # We do this because in some rare cases, an unexpected exception
+        # is raised when coercing a value to a unicode string. However, we don't
+        # want that error to actually interrupt airbrake.
+        return u"*** Airbrake is unable to coerce this value to unicode! ***"
 
 
 class AirbrakeHandler(logging.Handler):
     def __init__(self, api_key, env_name, api_url=_DEFAULT_API_URL,
                  timeout=30, env_variables=_DEFAULT_ENV_VARIABLES,
-                 meta_variables=_DEFAULT_META_VARIABLES, 
+                 meta_variables=_DEFAULT_META_VARIABLES,
                  redacted_keys=_DEFAULT_REDACTED_KEYS):
         logging.Handler.__init__(self)
         self.api_key = api_key
