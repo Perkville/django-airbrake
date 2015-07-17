@@ -76,13 +76,13 @@ class AirbrakeHandler(logging.Handler):
         server_env = SubElement(xml, 'server-environment')
         SubElement(server_env, 'environment-name').text = self.env_name
 
-        request_xml = SubElement(xml, 'request')
-        params = SubElement(request_xml, 'params')
-        session = SubElement(request_xml, 'session')
-        cgi_data = SubElement(request_xml, 'cgi-data')
-
         request = get_current_request()
         if request is not None:
+            request_xml = SubElement(xml, 'request')
+            params = SubElement(request_xml, 'params')
+            session = SubElement(request_xml, 'session')
+            cgi_data = SubElement(request_xml, 'cgi-data')
+
             try:
                 match = resolve(request.path_info)
             except Http404:
