@@ -127,7 +127,14 @@ class AirbrakeHandler(logging.Handler):
                     SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
         error = SubElement(xml, 'error')
-        SubElement(error, 'class').text = to_unicode(exn.__class__.__name__) if exn else 'NO CLASS NAME SUPPLIED'
+
+        exception_class_name = None
+        if exn:
+            exception_class_name = to_unicode(exn.__class__.__name__)
+        if not exception_class_name:
+            exception_class_name = 'NO CLASS NAME SUPPLIED'
+
+        SubElement(error, 'class').text = exception_class_name
         SubElement(error, 'message').text = to_unicode(message)
 
         backtrace = SubElement(error, 'backtrace')
