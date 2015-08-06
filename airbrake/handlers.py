@@ -116,15 +116,16 @@ class AirbrakeHandler(logging.Handler):
                     user.primary_email_id,
                     user.pk)
 
-        if trace is not None:
-            prev = trace
-            curr = trace.tb_next
-            while curr is not None:
-                prev = curr
-                curr = curr.tb_next
-            for key, value in prev.tb_frame.f_locals.items():
-                if key not in ['request']:
-                    SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
+            # Get variables from top-most stack frame
+            if trace is not None:
+                prev = trace
+                curr = trace.tb_next
+                while curr is not None:
+                    prev = curr
+                    curr = curr.tb_next
+                for key, value in prev.tb_frame.f_locals.items():
+                    if key not in ['request']:
+                        SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
         error = SubElement(xml, 'error')
 
