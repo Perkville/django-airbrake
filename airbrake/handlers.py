@@ -110,7 +110,7 @@ class AirbrakeHandler(logging.Handler):
                     SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
             if request.user.is_authenticated():
-                user = request.user.get_profile()
+                user = request.user.userprofile
                 SubElement(cgi_data, 'var', key='User').text = u"{0} <{1}> ({2})".format(
                     user.full_name,
                     user.primary_email_id,
