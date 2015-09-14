@@ -77,12 +77,17 @@ class AirbrakeHandler(logging.Handler):
         SubElement(server_env, 'environment-name').text = self.env_name
 
         request = get_current_request()
-        if request is not None:
-            request_xml = SubElement(xml, 'request')
-            params = SubElement(request_xml, 'params')
-            session = SubElement(request_xml, 'session')
-            cgi_data = SubElement(request_xml, 'cgi-data')
 
+        request_xml = SubElement(xml, 'request')
+        params = SubElement(request_xml, 'params')
+        session = SubElement(request_xml, 'session')
+        cgi_data = SubElement(request_xml, 'cgi-data')
+
+        if request is None:
+            SubElement(request_xml, 'url').text = "NO-REQUEST"
+            SubElement(request_xml, 'component').text = "NO-REQUEST"
+            SubElement(request_xml, 'action').text = "NO-REQUEST"
+        else:
             try:
                 match = resolve(request.path_info)
             except Http404:
@@ -116,16 +121,16 @@ class AirbrakeHandler(logging.Handler):
                     user.primary_email_id,
                     user.pk)
 
-            # Get variables from top-most stack frame
-            if trace is not None:
-                prev = trace
-                curr = trace.tb_next
-                while curr is not None:
-                    prev = curr
-                    curr = curr.tb_next
-                for key, value in prev.tb_frame.f_locals.items():
-                    if key not in ['request']:
-                        SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
+        # Get variables from top-most stack frame
+        if trace is not None:
+            prev = trace
+            curr = trace.tb_next
+            while curr is not None:
+                prev = curr
+                curr = curr.tb_next
+            for key, value in prev.tb_frame.f_locals.items():
+                if key not in ['request']:
+                    SubElement(cgi_data, 'var', key=to_unicode(key)).text = to_unicode(value)
 
         error = SubElement(xml, 'error')
 
