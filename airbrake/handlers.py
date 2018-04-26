@@ -9,7 +9,7 @@ import os
 from xml.etree.ElementTree import Element, tostring, SubElement
 import six
 
-from django.core.urlresolvers import resolve
+from django.urls import resolve
 from django.http import Http404
 
 from airbrake import __version__, __app_name__, __app_url__

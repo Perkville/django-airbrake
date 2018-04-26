@@ -2,3 +2,4 @@
 /.tox/
 /.coverage
 /htmlcov/
+*/__pycache__/*
