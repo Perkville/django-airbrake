@@ -1,9 +1,13 @@
 import logging
 import traceback
-import urllib2
+try:
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError
+except ImportError:
+    from urllib2 import Request, urlopen, HTTPError
 import os
-import sys
 from xml.etree.ElementTree import Element, tostring, SubElement
+import six
 
 from django.core.urlresolvers import resolve
 from django.http import Http404
@@ -25,17 +29,28 @@ _DEFAULT_REDACTED_KEYS = []
 
 def to_unicode(val):
     try:
-        if type(val) is unicode:
+        # six.text_type is `unicode` in Py2, `str` in Py3
+        if isinstance(val, six.text_type):  
             return val
-        elif isinstance(val, basestring):
-            return unicode(val, 'utf-8')
+        # six.string_types is `basestring` in Py2, `str` in Py3 (But the latter case will be caught above)
+        # six.binary_types is `str` in Py2, `bytes` in Py3
+        elif isinstance(val, six.string_types) \
+                or isinstance(val, six.binary_types):  
+            if six.PY2:
+                # We take a guess at Unicode since we don't really know what it is
+                return six.text_type(val, 'utf-8')
+            elif six.PY3:
+                # Python 3 seems to nicely convert byte strings into UTF-8 text when you
+                # call str() on it
+                return six.text_type(val)
         else:
-            return unicode(val)
+            return six.text_type(val)
     except:
         # We do this because in some rare cases, an unexpected exception
         # is raised when coercing a value to a unicode string. However, we don't
         # want that error to actually interrupt airbrake.
-        return u"*** Airbrake is unable to coerce this value to unicode! ***"
+        return "*** Airbrake is unable to coerce this value to unicode! ***"
+
 
 
 class AirbrakeHandler(logging.Handler):
@@ -63,7 +78,7 @@ class AirbrakeHandler(logging.Handler):
 
         message = record.getMessage()
         if exn:
-            message = u"{0}: {1}".format(message, exn)
+            message = "{0}: {1}".format(message, exn)
 
         xml = Element('notice', dict(version='2.0'))
         SubElement(xml, 'api-key').text = self.api_key
@@ -96,16 +111,20 @@ class AirbrakeHandler(logging.Handler):
             SubElement(request_xml, 'url').text = request.build_absolute_uri()
 
             if match:
-                SubElement(request_xml, 'component').text = match.url_name
+                SubElement(request_xml, 'component').text = "%s.%s" % \
+                    (match.func.__module__, match.func.__name__)
                 SubElement(request_xml, 'action').text = request.method
 
-            for key, value in request.REQUEST.items():
+
+            params = SubElement(request_xml, 'params')
+            for key, value in request.POST.items():
                 if key in self.redacted_keys:
                     value = '*** REDACTED ***'
-                SubElement(params, 'var', key=to_unicode(key)).text = to_unicode(value)
+                SubElement(params, 'var', dict(key=to_unicode(key))).text = to_unicode(value)
 
-            for key, value in request.session.items():
-                SubElement(session, 'var', key=to_unicode(key)).text = to_unicode(value)
+            session = SubElement(request_xml, 'session')
+            for key, value in getattr(request, 'session', {}).items():
+                SubElement(session, 'var', dict(key=to_unicode(key))).text = to_unicode(value)
 
             for key, value in os.environ.items():
                 if key in self.env_variables:
@@ -116,7 +135,7 @@ class AirbrakeHandler(logging.Handler):
 
             if request.user.is_authenticated():
                 user = request.user.userprofile
-                SubElement(cgi_data, 'var', key='User').text = u"{0} <{1}> ({2})".format(
+                SubElement(cgi_data, 'var', key='User').text = "{0} <{1}> ({2})".format(
                     user.full_name,
                     user.primary_email_id,
                     user.pk)
@@ -157,11 +176,11 @@ class AirbrakeHandler(logging.Handler):
         return tostring(xml)
 
     def _sendHttpRequest(self, headers, message):
-        request = urllib2.Request(self.api_url, message, headers)
+        request = Request(self.api_url, message, headers)
         try:
-            response = urllib2.urlopen(request, timeout=self.timeout)
+            response = urlopen(request, timeout=self.timeout)
             status = response.getcode()
-        except urllib2.HTTPError as e:
+        except HTTPError as e:
             status = e.code
         return status
 
@@ -170,8 +189,6 @@ class AirbrakeHandler(logging.Handler):
         status = self._sendHttpRequest(headers, message)
         if status == 200:
             return
-
-        exceptionMessage = "Unexpected status code {0}".format(str(status))
 
         if status == 403:
             exceptionMessage = "Unable to send using SSL"
@@ -183,5 +200,8 @@ class AirbrakeHandler(logging.Handler):
         elif status == 503:
             exceptionMessage = "Service unavailable. You may be over your " \
                                "quota."
+        else:
+            exceptionMessage = "Unexpected status code {0}".format(str(status))
 
-        print >>sys.stderr, '[django-airbrake]', exceptionMessage
+        # @todo log this message, but prevent circular logging
+        raise Exception('[django-airbrake] %s' % exceptionMessage)

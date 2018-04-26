@@ -1,4 +1,6 @@
-from lxml import etree
+import os
+import tempfile
+import sh
 
 
 def xml_compare(x1, x2, reporter=None):
@@ -35,12 +37,11 @@ def xml_compare(x1, x2, reporter=None):
         return False
     for i, c1 in enumerate(cl1):
         for c2 in cl2:
-            if xml_compare(c1, c2):  # no reporter, fail silently
+            if xml_compare(c1, c2, reporter=reporter):  # no reporter, fail silently
                 cl2.remove(c2)
                 break
         else:
             if reporter:
-                xml_compare(c1, x2.getchildren()[i], reporter=reporter)
                 reporter('<%s> children %i do not match: %s'
                          % (x1.tag, i, c1.tag))
             return False
@@ -55,7 +56,10 @@ def text_compare(t1, t2):
     return (t1 or '').strip() == (t2 or '').strip()
 
 
-def xsd_validate(tree):
-    xml_doc = etree.parse('tests/schema.xsd')
-    xml_schema = etree.XMLSchema(xml_doc)
-    assert xml_schema.validate(tree)
+def xsd_validate(xml_bytes):
+    with tempfile.NamedTemporaryFile() as f:
+        f.write(xml_bytes)
+        f.flush()
+
+        sh.xmllint(f.name, '--noout', '--schema',
+                   os.path.abspath('tests/schema.xsd'))
